@@ -15,6 +15,7 @@
 - [Unhashed vs SHA1 upstream names](#unhashed-vs-sha1-upstream-names)
 - [Separate Containers](#separate-containers)
 - [Docker Compose](#docker-compose)
+- [Configuration Summary](#configuration-summary)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 
@@ -33,13 +34,19 @@ You can also use wildcards at the beginning and the end of host name, like `*.ba
 To set the default host for nginx use the env var `DEFAULT_HOST=foo.bar.com` for example
 
 ```console
-docker run -d -p 80:80 -e DEFAULT_HOST=foo.bar.com -v /var/run/docker.sock:/tmp/docker.sock:ro nginxproxy/nginx-proxy
+docker run --detach \
+    --publish 80:80 \
+    --env DEFAULT_HOST=foo.bar.com \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 nginx-proxy will then redirect all requests to a container where `VIRTUAL_HOST` is set to `DEFAULT_HOST`, if they don't match any (other) `VIRTUAL_HOST`. Using the example above requests without matching `VIRTUAL_HOST` will be redirected to a plain nginx instance after running the following command:
 
 ```console
-docker run -d -e VIRTUAL_HOST=foo.bar.com nginx
+docker run --detach \
+    --env VIRTUAL_HOST=foo.bar.com \
+    nginx
 ```
 
 ### Virtual Ports
@@ -179,7 +186,12 @@ If the application runs natively on this sub-path or has a setting to do so, `VI
 If the requests are expected to not contain a sub-path and the generated links contain the sub-path, `VIRTUAL_DEST=/` should be used.
 
 ```console
-$ docker run -d -e VIRTUAL_HOST=example.tld -e VIRTUAL_PATH=/app1/ -e VIRTUAL_DEST=/ --name app1 app
+docker run --detach \
+    --name app1 \
+    --env VIRTUAL_HOST=example.tld \
+    --env VIRTUAL_PATH=/app1/ \
+    --env VIRTUAL_DEST=/ \
+    app
 ```
 
 In this example, the incoming request `http://example.tld/app1/foo` will be proxied as `http://app1/foo` instead of `http://app1/app1/foo`.
@@ -221,7 +233,13 @@ Nginx variables such as `$scheme`, `$host`, and `$request_uri` can be used. Howe
 If you want to use `nginx-proxy` with different external ports that the default ones of `80` for `HTTP` traffic and `443` for `HTTPS` traffic, you'll have to use the environment variable(s) `HTTP_PORT` and/or `HTTPS_PORT` in addition to the changes to the Docker port mapping. If you change the `HTTPS` port, the redirect for `HTTPS` traffic will also be configured to redirect to the custom port. Typical usage, here with the custom ports `1080` and `10443`:
 
 ```console
-docker run -d -p 1080:1080 -p 10443:10443 -e HTTP_PORT=1080 -e HTTPS_PORT=10443 -v /var/run/docker.sock:/tmp/docker.sock:ro nginxproxy/nginx-proxy
+docker run --detach \
+    --publish 1080:1080 \
+    --publish 10443:10443 \
+    --env HTTP_PORT=1080 \
+    --env HTTPS_PORT=10443 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 ### Multiple Networks
@@ -231,8 +249,12 @@ With the addition of [overlay networking](https://docs.docker.com/engine/usergui
 If you want your `nginx-proxy` container to be attached to a different network, you must pass the `--net=my-network` option in your `docker create` or `docker run` command. At the time of this writing, only a single network can be specified at container creation time. To attach to other networks, you can use the `docker network connect` command after your container is created:
 
 ```console
-docker run -d -p 80:80 -v /var/run/docker.sock:/tmp/docker.sock:ro \
-    --name my-nginx-proxy --net my-network nginxproxy/nginx-proxy
+docker run --detach \
+    --name my-nginx-proxy \
+    --publish 80:80 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    --net my-network \
+    nginxproxy/nginx-proxy
 docker network connect my-other-network my-nginx-proxy
 ```
 
@@ -336,10 +358,12 @@ In order to be able to secure your virtual host, you have to create a file named
 `/etc/nginx/htpasswd/`. Example: `/etc/nginx/htpasswd/app.example.com`.
 
 ```console
-docker run -d -p 80:80 -p 443:443 \
-    -v /path/to/htpasswd:/etc/nginx/htpasswd \
-    -v /path/to/certs:/etc/nginx/certs \
-    -v /var/run/docker.sock:/tmp/docker.sock:ro \
+docker run --detach \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /path/to/htpasswd:/etc/nginx/htpasswd \
+    --volume /path/to/certs:/etc/nginx/certs \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
     nginxproxy/nginx-proxy
 ```
 
@@ -399,10 +423,10 @@ To remove colors from the container log output, set the [`NO_COLOR` environment 
 
 ```console
 docker run --detach \
-  --publish 80:80 \
-  --env NO_COLOR=1 \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  nginxproxy/nginx-proxy
+    --publish 80:80 \
+    --env NO_COLOR=1 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 ⬆️ [back to table of contents](#table-of-contents)
@@ -414,7 +438,12 @@ SSL is supported using single host, wildcard and SAN certificates using naming c
 To enable SSL:
 
 ```console
-docker run -d -p 80:80 -p 443:443 -v /path/to/certs:/etc/nginx/certs -v /var/run/docker.sock:/tmp/docker.sock:ro nginxproxy/nginx-proxy
+docker run --detach \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /path/to/certs:/etc/nginx/certs \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 The contents of `/path/to/certs` should contain the certificates and private keys for any virtual hosts in use. The certificate and keys should be named after the virtual host with a `.crt` and `.key` extension. For example, a container with `VIRTUAL_HOST=foo.bar.com` should have a `foo.bar.com.crt` and `foo.bar.com.key` file in the certs directory.
@@ -431,6 +460,8 @@ By default nginx-proxy generates location blocks to handle ACME HTTP Challenge. 
 - `false`: do not handle ACME HTTP Challenge at all.
 - `legacy`: legacy behavior for compatibility with older (<= `2.3`) versions of acme-companion, only handle ACME HTTP challenge when there is a certificate for the domain and `HTTPS_METHOD=redirect`.
 
+By default, nginx-proxy does not handle ACME HTTP Challenges for unknown virtual hosts. This may happen in cases when a container is not running at the time of the renewal. To enable handling of unknown virtual hosts, set `ACME_HTTP_CHALLENGE_ACCEPT_UNKNOWN_HOST` environment variable to `true` on the nginx-proxy container.
+
 ### Diffie-Hellman Groups
 
 [RFC7919 groups](https://datatracker.ietf.org/doc/html/rfc7919#appendix-A) with key lengths of 2048, 3072, and 4096 bits are [provided by `nginx-proxy`](https://github.com/nginx-proxy/nginx-proxy/dhparam). The ENV `DHPARAM_BITS` can be set to `2048` or `3072` to change from the default 4096-bit key. The DH key file will be located in the container at `/etc/nginx/dhparam/dhparam.pem`. Mounting a different `dhparam.pem` file at that location will override the RFC7919 key.
@@ -445,7 +476,7 @@ In the separate container setup, no pre-generated key will be available and neit
 Set `DHPARAM_SKIP` environment variable to `true` to disable using default Diffie-Hellman parameters. The default value is `false`.
 
 ```console
-docker run -e DHPARAM_SKIP=true ....
+docker run --env DHPARAM_SKIP=true ....
 ```
 
 ### Wildcard Certificates
@@ -661,7 +692,11 @@ IPv4 and IPv6 are never both used at the same time on containers that use both I
 By default the nginx-proxy container will only listen on IPv4. To enable listening on IPv6 too, set the `ENABLE_IPV6` environment variable to `true`:
 
 ```console
-docker run -d -p 80:80 -e ENABLE_IPV6=true -v /var/run/docker.sock:/tmp/docker.sock:ro nginxproxy/nginx-proxy
+docker run --detach \
+    --publish 80:80 \
+    --env ENABLE_IPV6=true \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 ### Scoped IPv6 Resolvers
@@ -694,8 +729,11 @@ More reading on the potential TCP head-of-line blocking issue with HTTP/2: [HTTP
 HTTP/3 use the QUIC protocol over UDP (unlike HTTP/1.1 and HTTP/2 which work over TCP), so if you want to use HTTP/3 you'll have to explicitely publish the 443/udp port of the proxy in addition to the 443/tcp port:
 
 ```console
-docker run -d -p 80:80 -p 443:443/tcp -p 443:443/udp \
-    -v /var/run/docker.sock:/tmp/docker.sock:ro \
+docker run --detach \
+    --publish 80:80 \
+    --publish 443:443/tcp \
+    --publish 443:443/udp \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
     nginxproxy/nginx-proxy
 ```
 
@@ -788,12 +826,12 @@ client_max_body_size 100m;
 
 ```console
 docker run --detach \
-  --name nginx-proxy \
-  --publish 80:80 \
-  --publish 443:443 \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  --volume /path/to/my_proxy.conf:/etc/nginx/conf.d/my_proxy.conf:ro \
-  nginxproxy/nginx-proxy
+    --name nginx-proxy \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    --volume /path/to/my_proxy.conf:/etc/nginx/conf.d/my_proxy.conf:ro \
+    nginxproxy/nginx-proxy
 ```
 
 </details>
@@ -842,12 +880,12 @@ client_max_body_size 100m;
 
 ```console
 docker run --detach \
-  --name nginx-proxy \
-  --publish 80:80 \
-  --publish 443:443 \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/app.example.com:ro \
-  nginxproxy/nginx-proxy
+    --name nginx-proxy \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/app.example.com:ro \
+    nginxproxy/nginx-proxy
 ```
 
 </details>
@@ -877,13 +915,13 @@ If you are using multiple hostnames for a single container (e.g. `VIRTUAL_HOST=e
 
 ```console
 docker run --detach \
-  --name nginx-proxy \
-  --publish 80:80 \
-  --publish 443:443 \
-  --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/example.com:ro \
-  --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/www.example.com:ro \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  nginxproxy/nginx-proxy
+    --name nginx-proxy \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/example.com:ro \
+    --volume /path/to/custom-vhost-config.conf:/etc/nginx/vhost.d/www.example.com:ro \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    nginxproxy/nginx-proxy
 ```
 
 </details>
@@ -933,12 +971,12 @@ proxy_cache_valid 404 1m;
 
 ```console
 docker run --detach \
-  --name nginx-proxy \
-  --publish 80:80 \
-  --publish 443:443 \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/app.example.com_location:ro \
-  nginxproxy/nginx-proxy
+    --name nginx-proxy \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/app.example.com_location:ro \
+    nginxproxy/nginx-proxy
 ```
 
 </details>
@@ -968,13 +1006,13 @@ If you are using multiple hostnames for a single container (e.g. `VIRTUAL_HOST=e
 
 ```console
 docker run --detach \
-  --name nginx-proxy \
-  --publish 80:80 \
-  --publish 443:443 \
-  --volume /var/run/docker.sock:/tmp/docker.sock:ro \
-  --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/example.com_location:ro \
-  --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/www.example.com_location:ro \
-  nginxproxy/nginx-proxy
+    --name nginx-proxy \
+    --publish 80:80 \
+    --publish 443:443 \
+    --volume /var/run/docker.sock:/tmp/docker.sock:ro \
+    --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/example.com_location:ro \
+    --volume /path/to/custom-vhost-location-config.conf:/etc/nginx/vhost.d/www.example.com_location:ro \
+    nginxproxy/nginx-proxy
 ```
 
 </details>
@@ -1232,6 +1270,74 @@ I'm 5b129ab83266
 
 ⬆️ [back to table of contents](#table-of-contents)
 
+## Configuration summary
+
+This section summarize the configurations available on the proxy and proxied container.
+
+### Proxy container
+
+Configuration available either on the nginx-proxy container, or the docker-gen container in a [separate containers setup](#separate-containers):
+
+| Environment Variable | Default Value |
+|---------------------|---------------|
+| [`ACME_HTTP_CHALLENGE_LOCATION`](#ssl-support-using-an-acme-ca) | `true` |
+| [`ACME_HTTP_CHALLENGE_ACCEPT_UNKNOWN_HOST`](#ssl-support-using-an-acme-ca) | `false` |
+| [`DEBUG_ENDPOINT`](#debug-endpoint) | `false` |
+| [`DEFAULT_HOST`](#default-host) | no default value |
+| [`DEFAULT_ROOT`](#default_root) | `404` |
+| [`DHPARAM_SKIP`](#diffie-hellman-groups) | `false` |
+| [`DHPARAM_BITS`](#diffie-hellman-groups) | `4096` |
+| [`DISABLE_ACCESS_LOGS`](#disable-access-logs) | `false` |
+| [`ENABLE_HTTP_ON_MISSING_CERT`](#default-and-missing-certificate) | `true` |
+| [`ENABLE_HTTP2`](#http2-support) | `true` |
+| [`ENABLE_HTTP3`](#http3-support) | `false` |
+| [`ENABLE_IPV6`](#listening-on-ipv6) | `false` |
+| [`HTTP_PORT`](#custom-external-httphttps-ports) | `80` |
+| [`HTTPS_PORT`](#custom-external-httphttps-ports) | `443` |
+| [`HTTPS_METHOD`](#how-ssl-support-works) | `redirect` |
+| [`HSTS`](#how-ssl-support-works) | `max-age=31536000` |
+| [`LOG_FORMAT`](#custom-log-format) | no default value |
+| [`LOG_FORMAT_ESCAPE`](#log-format-escaping) | no default value |
+| [`LOG_JSON`](#json-log-format) | `false` |
+| [`NGINX_CONTAINER_LABEL`](#network-segregation) | `com.github.nginx-proxy.nginx-proxy.nginx` |
+| [`NON_GET_REDIRECT`](#how-ssl-support-works) | `301` |
+| [`PREFER_IPV6_NETWORK`](#ipv6-docker-networks) | `false` |
+| `RESOLVERS` | no default value |
+| [`SHA1_UPSTREAM_NAME`](#unhashed-vs-sha1-upstream-names) | `false` |
+| [`SSL_POLICY`](#how-ssl-support-works) | `Mozilla-Intermediate` |
+| [`TRUST_DEFAULT_CERT`](#default-and-missing-certificate) | `true` |
+| [`TRUST_DOWNSTREAM_PROXY`](#trusting-downstream-proxy-headers) | `true` |
+
+### Proxyied container
+
+Configuration available on each proxied container, either by environment variable or by label:
+
+| Environment Variable | Label | Default Value |
+|---------------------|---------------|---------------|
+| [`ACME_HTTP_CHALLENGE_LOCATION`](#ssl-support-using-an-acme-ca) | n/a | global (proxy) value |
+| [`CERT_NAME`](#san-certificates) | n/a | no default value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.debug-endpoint`](#debug-endpoint) | global (proxy) value |
+| [`ENABLE_HTTP_ON_MISSING_CERT`](#default-and-missing-certificate) | n/a | global (proxy) value |
+| [`HSTS`](#how-ssl-support-works) | n/a | global (proxy) value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.http2.enable`](#http2-support) | global (proxy) value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.http3.enable`](#http3-support) | global (proxy) value |
+| [`HTTPS_METHOD`](#how-ssl-support-works) | n/a | global (proxy) value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.keepalive`](#upstream-server-http-keep-alive-support) | `auto` |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.loadbalance`](#upstream-server-http-load-balancing-support) | no default value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.non-get-redirect`](#how-ssl-support-works) | global (proxy) value |
+| [`SERVER_TOKENS`](#per-virtual_host-server_tokens-configuration) | n/a | no default value |
+| [`SSL_POLICY`](#how-ssl-support-works) | n/a | global (proxy) value |
+| n/a | [`com.github.nginx-proxy.nginx-proxy.trust-default-cert`](#default-and-missing-certificate) | global (proxy) value |
+| [`VIRTUAL_DEST`](#virtual_dest) | n/a | `empty string` |
+| [`VIRTUAL_HOST`](#virtual-hosts-and-ports) | n/a | no default value |
+| [`VIRTUAL_HOST_MULTIPORTS`](#multiple-ports) | n/a | no default value |
+| [`VIRTUAL_PATH`](#path-based-routing) | n/a | `/` |
+| [`VIRTUAL_PORT`](#virtual-ports) | n/a | no default value |
+| [`VIRTUAL_PROTO`](#upstream-backend-features) | n/a | `http` |
+| [`VIRTUAL_ROOT`](#fastcgi-file-root-directory) | n/a | `/var/www/public` |
+
+⬆️ [back to table of contents](#table-of-contents)
+
 ## Troubleshooting
 
 If you can't access your `VIRTUAL_HOST`, inspect the generated nginx configuration:
@@ -1245,14 +1351,14 @@ Pay attention to the `upstream` definition blocks, which should look like this:
 ```nginx
 # foo.example.com
 upstream foo.example.com {
-	## Can be connected with "my_network" network
-	# Exposed ports: [{   <exposed_port1>  tcp } {   <exposed_port2>  tcp } ...]
-	# Default virtual port: <exposed_port|80>
-	# VIRTUAL_PORT: <VIRTUAL_PORT>
-	# foo
-	server 172.18.0.9:<Port>;
-	# Fallback entry
-	server 127.0.0.1 down;
+  ## Can be connected with "my_network" network
+  # Exposed ports: [{   <exposed_port1>  tcp } {   <exposed_port2>  tcp } ...]
+  # Default virtual port: <exposed_port|80>
+  # VIRTUAL_PORT: <VIRTUAL_PORT>
+  # foo
+  server 172.18.0.9:<Port>;
+  # Fallback entry
+  server 127.0.0.1 down;
 }
 ```
 
